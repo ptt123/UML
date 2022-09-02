@@ -1,0 +1,4 @@
+@startuml
+A-->B: test
+B-->A: test success
+@enduml

@@ -1,0 +1,12 @@
+@startuml
+小程序-->小程序: wx.login()获取code
+小程序-->开发者服务器: wx.request()发送code\n静默登录接口
+开发者服务器-->微信接口服务:登录凭证校验接口 \n appid + appsecret + code
+微信接口服务-->开发者服务器: session_key + openid + unionid等
+开发者服务器-->开发者服务器: 自定义登录态（与openid,session_key关联）\n根据openid查询用户\n查询无果，写入一条匿名用户信息
+开发者服务器-->小程序: 返回自定义登录态token和用户信息等
+小程序-->小程序: 存储token到storage和\n用户信息到全局globalData
+小程序-->开发者服务器: wx.request()发起业务请求\n携带token
+开发者服务器-->开发者服务器: 通过token\n查询session_key等相关信息
+开发者服务器-->小程序: 返回业务数据
+@enduml

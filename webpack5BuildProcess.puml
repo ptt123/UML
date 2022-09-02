@@ -1,0 +1,112 @@
+@startuml
+|webpack/bin/webpack.js|
+start
+:runCLI(cli);
+
+|webpack-cli/lib/bootstrap.js|
+:runCLI(args);
+
+|webpack-cli/lib/webpack-cli.js|
+:run(args, parseOptions);
+:this.program.action(async (options, program) => {});
+:loadCommandByName(commandName, allowToInstall);
+:this.loadWebpack();
+:this.runWebpack(options, isWatchCommand);
+:this.createCompiler(options, callback);
+:this.webpack(options, callback);
+
+|webpack/lib/webpack.js|
+:webpack(options, callback);
+:const { compiler, watch, watchOptions } = create();
+:compiler = createCompiler(webpackOptions);
+:注册自己配置的插件的回调plugin.apply(compiler);
+:new WebpackOptionsApply().process(options, compiler)根据我们的配置，会注册对应的内部插件;
+
+|webpack/lib/WebpackOptionsApply.js|
+:process(options, compiler) {
+    new EntryOptionPlugin().apply(compiler)
+    compiler.hooks.entryOption.call(options.context, options.entry)
+};
+
+|webpack/lib/EntryOptionPlugin.js|
+:apply(compiler) {
+    // 订阅compiler entryOption钩子，回调中执行EntryOptionPlugin.applyEntryOption(compiler, context, entry)
+};
+
+|webpack/lib/WebpackOptionsApply.js|
+:compiler.hooks.entryOption.call(options.context, options.entry) 触发compiler entryOption钩子;
+:注册其他内部插件;
+
+|webpack/lib/EntryOptionPlugin.js|
+:EntryOptionPlugin.applyEntryOption(compiler, context, entry);
+:static applyEntryOption(compiler, context, entry);
+:遍历entry,执行new EntryPlugin(context, entry, options).apply(compiler);
+
+|webpack/lib/EntryPlugin.js|
+:apply(compiler) {
+    // 订阅compiler make钩子，回调中执行compilation.addEntry(context, dep, options, callback)
+};
+
+|webpack/lib/webpack.js|
+:compiler.run(callback);
+
+|Compiler.js|
+:compiler.run(callback);
+:compiler.run.run();
+:compiler.compile(callback);
+:开始创建entry的compilation对象;
+:const compilation = this.newCompilation(params);
+:newCompilation(params){const compilation = this.createCompilation(params)};
+:new Compilation(this, params);
+
+|Compilation.js|
+:constructor(compiler, params);
+
+|Compiler.js|
+:this.hooks.make.callAsync(compilation, callback);
+
+|webpack/lib/EntryPlugin.js|
+:compilation.addEntry(context, dep, options, callback);
+
+|Compilation.js|
+:addEntry(context, entry, optionsOrName, callback) {
+    this._addEntryItem(context, entry, "dependencies", options, callback)
+};
+:_addEntryItem(context, entry, target, options, callback) {
+    this.addModuleTree({ context, dependency, contextInfo }, callback)
+};
+:addModuleTree({ context, dependency, contextInfo }, callback) {
+    this.handleModuleCreation({factory, dependencies, originModule, contextInfo, context}, callback)
+};
+:handleModuleCreation({factory, dependencies, originModule, contextInfo, context}, callback) {
+    this.factorizeModule({currentProfile,factory,dependencies,factoryResult: true,originModule,contextInfo,context}, callback)
+};
+:开始创建index.html的compilation对象;
+:省略一些步骤...;
+:handleModuleCreation({factory, dependencies, originModule, contextInfo, context}, callback) {
+    this.factorizeModule({currentProfile,factory,dependencies,factoryResult: true,originModule,contextInfo,context}, callback)
+};
+:_factorizeModule({currentProfile, factory, dependencies, originModule, factoryResult, contextInfo, context}, callback) {
+    factory.create(data, callback)
+}
+
+|lib/NormalModuleFactory.js|
+:create(data, callback) {
+    callback(err, factoryResult)
+};
+
+|Compilation.js|
+:_factorizeModule(data, callback) {
+    factory.create(data, (err, result) => {
+        callback(null, factoryResult ? result : result.module)
+    })
+};
+:this.factorizeModule({currentProfile,factory,dependencies,factoryResult: true,originModule,contextInfo,context}, (err, factoryResult) => {
+    // TODO
+})
+
+|loader-runner/lib/LoaderRunner.js|
+
+|webpack/lib/javascript/JavascriptParser.js|
+
+@enduml
