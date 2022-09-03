@@ -51,9 +51,19 @@ start
 :compiler.run(callback);
 
 |Compiler.js|
-:compiler.run(callback);
-:compiler.run.run();
-:compiler.compile(callback);
+:run(callback);
+:run.run();
+:const run = () => {
+    this.compile(onCompiled)
+};
+:const onCompiled = (err, compilation) => {
+    process.nextTick(() => {
+       this.emitAssets(compilation, err => {
+            this.hooks.done.callAsync(stats, err => {})
+       }) 
+    })
+};
+:compile(callback);
 :开始创建entry的compilation对象;
 :const compilation = this.newCompilation(params);
 :newCompilation(params){const compilation = this.createCompilation(params)};
@@ -102,11 +112,127 @@ start
     })
 };
 :this.factorizeModule({currentProfile,factory,dependencies,factoryResult: true,originModule,contextInfo,context}, (err, factoryResult) => {
-    // TODO
-})
+    this.addModule(newModule, (err, module) => {})
+});
+:_addModule(module, callback){
+    callback(null, module)
+};
+:this.addModule(newModule, (err, module) => {
+    this._handleModuleBuildAndDependencies(
+        originModule,
+        module,
+        recursive,
+        callback
+    )
+});
+:_handleModuleBuildAndDependencies(originModule, module, recursive, callback) {
+    this.buildModule(module, err => {})
+};
+:_buildModule(module, callback) {
+    module.needModule(context, (err, needBuild) => {
+        module.build(this.options,this,this.resolverFactory.get("normal", module.resolveOptions),this.inputFileSystem,err => {})
+    })
+};
+
+|NormalModule.js|
+:needBuild(context, callback) {
+    return callback(null, true)
+};
+:build(options, compilation, resolver, fs, callback) {
+    return this._doBuild(options, compilation, resolver, fs, hooks, err => {
+        let result
+        const source = this._source.source()
+        result = this.parser.parse(this._ast || source, {
+            source,
+            current: this,
+            module: this,
+            compilation: compilation,
+            options: options
+        })
+    })
+};
+:_doBuild;
+note right
+_doBuild(options, compilation, resolver, fs, hooks, callback) {
+    const processResult = (err, result) => {return callback()}
+    runLoaders(options, (err, result) => {
+        // loader解析模块为标准js模块
+        processResult(err, result.result)
+    })
+}
+end note
 
 |loader-runner/lib/LoaderRunner.js|
+:runLoaders(options, callback) {
+    callback()
+};
+
+|NormalModule.js|
+:this._doBuild;
+note right
+this._doBuild(options, compilation, resolver, fs, hooks, err => {
+    let result
+    const source = this._source.source()
+    // parser.parse 对JS代码进行语法解析,解析成AST语法树
+    result = this.parser.parse(this._ast || source, {
+        source,
+        current: this,
+        module: this,
+        compilation: compilation,
+        options: options
+    })
+    const handleParseResult = e => {
+        return callback()
+    }
+    ' // 处理ast importDeclation,并添加到module的dependencies中
+    handleParseResult(result)
+})
+end note
 
 |webpack/lib/javascript/JavascriptParser.js|
+:parse(source, state) {
+    return state
+};
+
+|NormalModule.js|
+:this._doBuild(..., err => {
+    callback()
+});
+
+|Compilation.js|
+:module.build(this.options,this,this.resolverFactory.get("normal", module.resolveOptions),this.inputFileSystem,err => {callback()});
+:this.buildModule(module, err => {
+    this.processModuleDependencies(module, err => {
+        callback(null, module)
+    })
+});
+:_processModuleDependencies;
+note right
+_processModuleDependencies(module, callbak) {
+    遍历module.dependencies,将dep转换为module
+    for (const item of sortedDependencies) {
+        inProgressTransitive++;
+        this.handleModuleCreation(item, err => {})
+    }
+}
+end note
+:handleModuleCreation() {
+    // 重复上面创建module的步骤
+};
+:所有module创建完毕;
+
+|Compiler.js|
+:compile(callback) {
+    // make阶段执行完毕，接着调用compilation.seal
+    compilation.seal(err => {
+        return callback(null, compilation)
+    })
+};
+:seal(callback) {
+    // todo
+};
+
+
+
 
 @enduml
