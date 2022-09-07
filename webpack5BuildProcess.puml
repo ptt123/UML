@@ -228,11 +228,242 @@ end note
         return callback(null, compilation)
     })
 };
-:seal(callback) {
-    // todo
+
+|Compilation.js|
+:seal(callback);
+note right
+seal(callback) {
+    // 遍历entry
+    for ( of this.entries) {
+        // 每一个入口module生成一个入口chunk
+        // 处理module.dependencies
+        this.assignDepths(entryModules)
+    }
+}
+end note
+:assignDepths(modules) {
+    // 深度遍历所有的module,生成compilation.moduleGraph(记录了模块的层级关系)
 };
+:seal(callback) {
+    ' 处理ChunkGraph（记录了chunk的层级关系）
+    ' 根据ChunkGraph生成chunks
+    buildChunkGraph(this, chunkGraphInit)
+    ' 触发钩子，插件中订阅了钩子，回调中对chunk和modules进行一些列优化
+    this.hooks.optimize.call()
+    this.hooks.optimizeChunkModules.callAsync(this.chunks, this.modules, err => {
+        this.createChunkAssets(err => {cont()})
+    })
+};
+:createChunkAssets(callback);
+note right
+createChunkAssets(callback) {
+    ' 遍历chunks
+    asyncLib.forEachLimit(
+        this.chunks,
+        15, 
+        (chunk, callback) => {
+            /** @type {Array<Record<string, any>>} */
+            let manifest;
+            ' chunk生成的manifest,可能有css,js或者img等
+            manifest = this.getRenderManifest({
+                chunk,
+                ...
+            })
+            ' 遍历manifest
+            asyncLib.forEach(
+                manifest,
+                (fileManifest, callback) => {
+                    const ident = fileManifest.identifier;
+                    const usedHash = fileManifest.hash;
 
+                    const assetCacheItem = this._assetsCache.getItemCache(
+                        ident,
+                        usedHash
+                    );
 
+                    assetCacheItem.get((err, sourceFromCache) => {
+                        let filenameTemplate;
+                        let file;
+                        let assetInfo;
+                        ...
+                        let source = sourceFromCache;
+                        ' 将生成的源码存在compilation.assets
+                        this.emitAsset(file, source, assetInfo);
+                    })
+                },
+                callback
+            )
+        },
+        callback
+    )
+}
+end note
+:emitAsset(file, source, assetInfo = {});
+note right
+emitAsset(file, source, assetInfo = {}) {
+    if (this.assets[file]) {
+        ' assets中有当前file,则更新
+        this._setAssetInfo(file, newInfo, oldInfo);
+        return;
+    }
+    ' 存放生成的文件到assets中
+    this.assets[file] = source;
+    this._setAssetInfo(file, assetInfo, undefined);
+}
+end note
+:_setAssetInfo(file, newInfo, oldInfo = this.assetsInfo.get(file));
+note right
+_setAssetInfo(file, newInfo, oldInfo = this.assetsInfo.get(file)) {
+    ' 生成file的assetInfo
+    ...
+}
+end note
 
+|Compiler.js|
+:回到compile(callback);
+note right
+compile(callback) {
+    compilation.seal(err => {
+        this.hooks.afterCompile.callAsync(compilation, err => {
+            ...
+            return callback(null, compilation);
+        })
+    })
+}
+end note
+:回到run(callback);
+note right
+run(callback) {
+    const onCompiled = () => {
+        ' 执行compile回调
+    }
+    const run = () => {
+        ...
+        this.compile(onCompiled);
+    }
+    run()
+}
+end note
+
+:const onCompiled = (err, compilation) => {};
+note right
+const onCompiled = (err, compilation) => {
+    ...
+    process.nextTick(() => {
+        this.emitAssets(compilation, err => {
+            this.hooks.callAsync(stats, err => {
+                ' 本次构建流程结束
+            })
+        })
+    })
+}
+end note
+
+:emitAssets(compilation, callback);
+note right
+emitAssets(compilation, callback) {
+    const emitFiles = err => {})
+    this.hooks.emit.callAsync(compilation, err => {
+        if (err) return callback(err);
+        outputPath = compilation.getPath(this.outputPath, {});
+        mkdirp(this.outputFileSystem, outputPath, emitFiles);
+    })
+}
+end note
+
+|webpack/lib/util/fs.js|
+note right
+:const mkdirp = (fs, p, callback) {
+    fs.mkdir(p, err => {
+        if (err) {
+            ...
+            callback(err);
+            return;
+        }
+        callback();
+    })
+}
+end note
+
+|Compiler.js|
+:回到emitAssets;
+note right
+emitAssets(compilation, callback) {
+    ' 回到emitFiles
+    const emitFiles = err => {
+        const assets = compilation.getAssets();
+        compilation.assets = { ...compilation.assets };
+        ' 遍历assets
+        asyncLib.forEachLimit(
+            assets,
+            15,
+            ({ name: file, source, info }, callback) => {
+                callback()
+            },
+            err => {
+                this.hooks.afterEmit.callAsync(compilation, err => {
+                    ' 将assets写入文件系统
+                    return callback();
+                })
+            }
+        )
+    }
+}
+end note
+
+:回到const onCompiled = (err, compilation) => {};
+note right
+const onCompiled = (err, compilation) => {
+    ...
+    ' 回到this.emitAssets回调中
+    this.emitAssets(compilation, err => {
+        this.hooks.callAsync(stats, err => {
+            ' 本次构建流程结束
+            return finalCallback(null, stats);
+        })
+    })
+}
+end note
+
+:回到const finalCallback = (err, stats) => {};
+note right
+const finalCallback = (err, stats) => {
+    if (callback !== undefined) callback(err, stats);
+    this.hooks.afterDone.call(stats);
+};
+end note
+
+|lib/webpack.js|
+:回到webpack(options, callback) => {};
+note right
+const webpack(options, callback) => {
+    compiler.run((err, stats) => {
+        ' 回到compiler.run的回调
+        compiler.close(err2 => {
+            callback(err || err2, stats);
+        });
+    });
+}
+end note
+
+|webpack-cli/lib/webpack-cli.js|
+:回到createCompiler(options, callback) {};
+note right
+async createCompiler(options, callback) {
+    compiler = this.webpack(
+        config.options,
+        callback
+            ? (error, stats) => {
+                if (error && this.isValidationError(error)) {
+                    this.logger.error(error.message);
+                    process.exit(2);
+                }
+
+                callback(error, stats);
+            }
+        : callback,
+    );
+}
+end note
 
 @enduml
