@@ -1,0 +1,22 @@
+@startmindmap
+<style>
+mindmapDiagram {
+  .green {
+    BackgroundColor lightgreen
+  }
+  .rose {
+    BackgroundColor #FFBBCC
+  }
+  .your_style_name {
+    BackgroundColor lightblue
+  }
+}
+</style>
+* javascript模块方案
+** 浏览器端 <<green>>
+*** CMD <<green>>
+*** AMD <<green>>
+** 服务器端 <<rose>>
+*** CommonJS <<rose>>
+** UMD <<your_style_name>>
+@endmindmap
